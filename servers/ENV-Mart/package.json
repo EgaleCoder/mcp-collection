@@ -1,0 +1,33 @@
+{
+  "name": "evn-mart-mcp",
+  "version": "2.0.0",
+  "description": "EVN-Mart MCP Server — Semantic clothing search powered by LanceDB + LangChain + local embeddings",
+  "type": "module",
+  "main": "src/main.ts",
+  "scripts": {
+    "dev": "tsx --watch src/main.ts",
+    "start": "tsx src/main.ts",
+    "build": "tsc",
+    "serve": "node dist/main.js"
+  },
+  "keywords": [
+    "mcp",
+    "express",
+    "modelcontextprotocol"
+  ],
+  "author": "EgaleCoder",
+  "license": "ISC",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.6.0",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.2"
+  }
+}
