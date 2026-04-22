@@ -29,7 +29,7 @@ export function registerGetProductDetailsTool(server: McpServer): void {
     async ({ product_nos }) => {
       try {
         const clothesData = data; // In-memory data from searchClothes.tool.js; replace with LanceDB query in production
-
+        
         if (clothesData.length === 0) {
           return {
             content: [
