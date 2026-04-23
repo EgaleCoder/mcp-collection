@@ -144,7 +144,7 @@ app.get("/health", (_req, res) => {
   res.json({
     status: "ok",
     server: "evn-mart-mcp",
-    version: "1.0.0",
+    version: "2.0.1",
     activeSessions: sessions.size,
     mcpEndpoint: `POST/GET/DELETE ${MCP_ENDPOINT}`,
   });
@@ -156,7 +156,7 @@ app.get("/health", (_req, res) => {
 app.get("/", (_req, res) => {
   res.json({
     name: "EVN-Mart MCP Server",
-    version: "1.0.0",
+    version: "2.0.1",
     endpoints: {
       health: "/health",
       mcp: MCP_ENDPOINT,

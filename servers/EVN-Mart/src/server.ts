@@ -9,7 +9,7 @@ import { registerAllTools } from "./tools/index.js";
 export function createMcpServer(): McpServer {
   const server = new McpServer({
     name: "evn-mart-mcp",
-    version: "1.0.0",
+    version: "2.0.1",
   });
 
   // Register all tools (and resources / prompts) here
