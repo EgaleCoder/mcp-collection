@@ -1,6 +1,8 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { data } from "./searchClothes.tool.js";
+import { getTable } from "../lib/lancerDB-Client.js";
+import { ClothingMetadata, LanceRow } from "../type/columns.js";
+import { embedQuery } from "../lib/embeddings.js";
 
 // ---------------------------------------------------------------------------
 // Tool: get_product_details
@@ -15,28 +17,40 @@ export function registerGetProductDetailsTool(server: McpServer): void {
     "get_product_details",
     {
       description:
-        "This is a tool to retrieve complete metadata for specific products.",
+        "📄 SPECIFICATION TOOL — Retrieve the COMPLETE metadata for one or more specific products by their product_no. " +
+        "Returns all catalog fields including material, sustainability, EAN, weights, and photo URL. " +
+        "Use this AFTER search_clothes to get full specifications for a product the user wants to know more about. " +
+        "Accepts up to 20 product_nos in a single call.",
       inputSchema: {
         product_nos: z
           .array(z.string())
           .min(1)
           .max(20)
           .describe(
-            "One or more product numbers (from search_clothes results) to look up. Maximum 20 per call.",
+            "One or more product numbers (from search_clothes results) to look up. Maximum 20 per call."
           ),
       },
     },
     async ({ product_nos }) => {
       try {
-        const clothesData = data; // In-memory data from searchClothes.tool.js; replace with LanceDB query in production
-        
-        if (clothesData.length === 0) {
+        const table = await getTable();
+
+        // Build a SQL IN clause to fetch multiple products at once
+        const escaped = product_nos.map((pn) => `'${pn.replace(/'/g, "''")}'`);
+        const whereClause = `product_no IN (${escaped.join(", ")})`;
+
+        const results = await table
+          .query()
+          .where(whereClause)
+          .toArray();
+
+        if (results.length === 0) {
           return {
             content: [
               {
                 type: "text" as const,
                 text: JSON.stringify({
-                  error:
+                  error: `No products found for the given product_nos: ${product_nos.join(", ")}. ` +
                     "Verify the product numbers are correct (from a search_clothes result).",
                 }),
               },
@@ -45,13 +59,16 @@ export function registerGetProductDetailsTool(server: McpServer): void {
           };
         }
 
-        const items = clothesData.filter((item) =>
-          product_nos.includes(item.id.toString()),
-        );
+        // Strip the vector field (large, not useful to the LLM) => Its delete vectors from the response, leaving only metadata fields 
+        const items = results.map((row: any) => {
+          const { vector, ...rest } = row;
+          return rest;
+        });
 
-        const notFound = product_nos.filter(
-          (no) => !items.some((item) => item.id.toString() === no),
-        );
+        // Report any requested IDs that weren't found
+        const foundIds = new Set(items.map((it: any) => it.product_no));
+        const notFound = product_nos.filter((pn) => !foundIds.has(pn));
+
         return {
           content: [
             {
@@ -64,7 +81,7 @@ export function registerGetProductDetailsTool(server: McpServer): void {
                   products: items,
                 },
                 null,
-                2,
+                2
               ),
             },
           ],
@@ -90,6 +107,6 @@ export function registerGetProductDetailsTool(server: McpServer): void {
           isError: true,
         };
       }
-    },
+    }
   );
 }
