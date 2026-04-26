@@ -1,5 +1,8 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { getTable } from "../lib/lancerDB-Client.js";
+import { ClothingMetadata, LanceRow } from "../type/columns.js";
+import { embedQuery } from "../lib/embeddings.js";
 
 // ---------------------------------------------------------------------------
 // Tool: search_clothes
@@ -13,90 +16,107 @@ import { z } from "zod";
 // the returned product_no.
 // ---------------------------------------------------------------------------
 
-export let data = [
-  {
-    id: 1,
-    name: "Classic Oxford Shirt",
-    gender: "Men",
-    price: 45.0,
-    color: "Light Blue",
-    category: "Tops",
-  },
-  {
-    id: 2,
-    name: "High-Waist Skinny Jeans",
-    gender: "Women",
-    price: 59.99,
-    color: "Indigo",
-    category: "Bottoms",
-  },
-  {
-    id: 3,
-    name: "Heavyweight Cotton Hoodie",
-    gender: "Unisex",
-    price: 65.0,
-    color: "Heather Grey",
-    category: "Outerwear",
-  },
-  {
-    id: 4,
-    name: "Floral Summer Sundress",
-    gender: "Women",
-    price: 38.5,
-    color: "Multicolor",
-    category: "Dresses",
-  },
-  {
-    id: 5,
-    name: "Slim Fit Chinos",
-    gender: "Men",
-    price: 42.0,
-    color: "Olive",
-    category: "Bottoms",
-  },
-  {
-    id: 6,
-    name: "Graphic Crewneck Tee",
-    gender: "Unisex",
-    price: 22.0,
-    color: "Black",
-    category: "Tops",
-  },
-  {
-    id: 7,
-    name: "Water-Resistant Windbreaker",
-    gender: "Men",
-    price: 89.0,
-    color: "Navy",
-    category: "Outerwear",
-  },
-  {
-    id: 8,
-    name: "Pleated Midi Skirt",
-    gender: "Women",
-    price: 55.0,
-    color: "Emerald Green",
-    category: "Bottoms",
-  },
-];
-
 export function registerSearchClothesTool(server: McpServer): void {
   server.registerTool(
     "search_clothes",
     {
-      description: "Simple Search tool for finding clothing items.",
+      description:
+        "🔍 DISCOVERY TOOL — Find clothing items matching a natural language query across the entire EVN-Mart catalog. " +
+        "Returns a ranked summary list (name, brand, price, match score). " +
+        "Use this first to discover relevant product numbers, then call get_product_details for full specifications. " +
+        "Supports filters: gender, brand, category, colour, max_price.",
       inputSchema: {
         query: z
           .string()
           .min(2)
-          .describe(
-            "Natural language description of the clothing you are looking for.",
-          ),
+          .describe("Natural language description of the clothing you are looking for."),
+        gender: z
+          .string()
+          .optional()
+          .describe('Filter by gender. Common values: "Men", "Women", "Unisex", "Boys", "Girls".'),
+        brand: z
+          .string()
+          .optional()
+          .describe("Filter by exact brand name (case-sensitive as stored in catalog)."),
+        category: z
+          .string()
+          .optional()
+          .describe('Filter by main category, e.g. "T-Shirts", "Jeans", "Jackets".'),
+        colour: z
+          .string()
+          .optional()
+          .describe('Filter by colour EN, e.g. "Blue", "Red", "Black".'),
+        max_price: z
+          .number()
+          .positive()
+          .optional()
+          .describe("Maximum advice selling price in €."),
+        top_k: z
+          .number()
+          .int()
+          .min(1)
+          .max(500)
+          .optional()
+          .default(20)
+          .describe("Maximum number of results to return (1–500, default 20)."),
       },
     },
-    async ({ query }) => {
+    async ({
+      query,
+      gender,
+      brand,
+      category,
+      colour,
+      max_price,
+      top_k,
+    }) => {
       try {
-        const clothesData = data;
+        const table = await getTable();
+
+        // ── Embed the query locally ───────────────────────────────────────
+        const queryEmbedding = await embedQuery(query);
+
+        // ── Build SQL-like WHERE clause for LanceDB ───────────────────────
+        const conditions: string[] = [];
+
+        if (gender)    conditions.push(`gender = '${gender.replace(/'/g, "''")}'`);
+        if (brand)     conditions.push(`brand = '${brand.replace(/'/g, "''")}'`);
+        if (category)  conditions.push(`category = '${category.replace(/'/g, "''")}'`);
+        if (colour)    conditions.push(`colour = '${colour.replace(/'/g, "''")}'`);
+        if (max_price != null) conditions.push(`price <= ${max_price}`);
+
+        const whereClause = conditions.length > 0
+          ? conditions.join(" AND ")
+          : undefined;
+
+        // ── Query LanceDB ─────────────────────────────────────────────────
+        const nResults = top_k ?? 20;
+
+        let searchQuery = table
+          .vectorSearch(queryEmbedding)
+          .limit(nResults);
+
+        if (whereClause) {
+          searchQuery = searchQuery.where(whereClause);
+        }
+
+        const results = await searchQuery.toArray();
+
+        // ── Format results ────────────────────────────────────────────────
+        const finalItems = results.map((row: any, i: number) => ({
+          rank: i + 1,
+          product_no:  row.product_no  ?? "",
+          name:        row.name        ?? "",
+          brand:       row.brand       ?? "",
+          category:    row.category    ?? "",
+          colour:      row.colour      ?? "",
+          size:        row.size        ?? "",
+          price:       row.price       ?? 0,
+          gender:      row.gender      ?? "",
+          match_score: row._distance != null
+            ? `${Math.round((1 - row._distance) * 100)}%`
+            : "N/A",
+        }));
 
         return {
           content: [
@@ -105,10 +125,13 @@ export function registerSearchClothesTool(server: McpServer): void {
               text: JSON.stringify(
                 {
                   query,
-                  results: clothesData,
+                  filters_applied: { gender, brand, category, colour, max_price },
+                  total_results: finalItems.length,
+                  tip: "Use get_product_details with a product_no for full specifications.",
+                  items: finalItems,
                 },
                 null,
-                2,
+                2
               ),
             },
           ],
@@ -134,6 +157,6 @@ export function registerSearchClothesTool(server: McpServer): void {
           isError: true,
         };
       }
-    },
+    }
   );
 }
