@@ -69,7 +69,7 @@ app.post(MCP_ENDPOINT, async (req: Request, res: Response) => {
       onsessioninitialized: (newSessionId) => {
         // Store transport so the client can reuse it
         sessions.set(newSessionId, transport);
-        // console.log(`[MCP] Session created: ${newSessionId}`);
+        console.log(`[MCP] Session created: ${newSessionId}`);
       },
     });
 
@@ -113,7 +113,7 @@ app.get(MCP_ENDPOINT, async (req: Request, res: Response) => {
 
   if (!sessionId || !sessions.has(sessionId)) {
     res.status(400).json({ error: "Invalid or missing session ID." });
-    // console.log("[MCP] Invalid or missing session ID.");
+    console.log("[MCP] Invalid or missing session ID.");
     return;
   }
 
