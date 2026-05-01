@@ -10,11 +10,12 @@
     "build": "tsc"
   },
   "keywords": [],
-  "author": "",
+  "author": "EgaleCoder",
   "license": "ISC",
   "dependencies": {
     "@magic/fs": "^0.0.37",
     "@modelcontextprotocol/sdk": "^1.29.0",
+    "cors": "^2.8.6",
     "express": "^5.2.1",
     "fs-extra": "^11.3.4",
     "pdf-parse": "^2.4.5",
