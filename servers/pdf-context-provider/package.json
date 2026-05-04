@@ -1,6 +1,6 @@
 {
   "name": "datavault",
-  "version": "1.06.04.27",
+  "version": "1.03.05.26",
   "description": "This is the MCP server named DataVault. It is a server that can be used to run MCP plugins. It is written in JavaScript and uses the Node.js runtime. It is designed to be easy to use and to provide a good experience for plugin developers.",
   "type": "module",
   "main": "build/index.js",
@@ -22,6 +22,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/fs-extra": "^11.0.4",
     "@types/node": "^25.5.2",
